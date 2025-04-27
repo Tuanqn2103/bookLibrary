@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "booklibrary",
+    "slug": "booklibrary",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "newArchEnabled": true
+  }
+}
