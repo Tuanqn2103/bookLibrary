@@ -11,6 +11,7 @@ import BookDetailScreen from '../screens/book/BookDetailScreen';
 import BestSellerScreen from '../screens/book/BestSellerScreen';
 import AdminHomeScreen from '../screens/admin/AdminHomeScreen';
 import AddBookScreen from '../screens/admin/AddBookScreen';
+import EditBookScreen from '../screens/admin/EditBookScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +58,10 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="AddBook" 
             component={AddBookScreen}
+          />
+          <Stack.Screen 
+            name="EditBook" 
+            component={EditBookScreen}
           />
         </Stack.Navigator>
       </NavigationContainer>

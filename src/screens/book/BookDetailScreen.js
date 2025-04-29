@@ -1,99 +1,102 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
-  Image,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
 import { COLORS } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import BookCover from '../../components/BookCover';
+import { authorService } from '../../services/author.service';
+import { categoryService } from '../../services/category.service';
 
 const BookDetailScreen = ({ route, navigation }) => {
-  const { book } = route.params;
+  const { bookData } = route.params;
+  const book = bookData || {};
+
+  const [authorName, setAuthorName] = useState('');
+  const [categoryName, setCategoryName] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchNames = async () => {
+      if (book.author_id) {
+        try {
+          const author = await authorService.getAuthorById(book.author_id);
+          if (isMounted) setAuthorName(author?.authorname || 'Unknown');
+        } catch {
+          if (isMounted) setAuthorName('Unknown');
+        }
+      }
+      if (book.category_id) {
+        try {
+          const category = await categoryService.getCategoryById(book.category_id);
+          if (isMounted) setCategoryName(category?.categoryname || 'Unknown');
+        } catch {
+          if (isMounted) setCategoryName('Unknown');
+        }
+      }
+    };
+    fetchNames();
+    return () => { isMounted = false; };
+  }, [book.author_id, book.category_id]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}>
-            <Icon name="arrow-left" size={20} color={COLORS.black} />
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        {/* Header */}
+        <View style={styles.headerSection}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Icon name="arrow-left" size={22} color={COLORS.gray} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.favoriteButton}>
-            <Icon name="heart" size={20} color="red" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: book.image }}
-            style={styles.bookImage}
-            resizeMode="contain"
-          />
-        </View>
-
-        <View style={styles.infoContainer}>
-          <Text style={styles.title}>{book.title}</Text>
-          <Text style={styles.author}>{book.author}</Text>
-
-          <View style={styles.ratingContainer}>
-            <View style={styles.rating}>
-              <Icon name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>4.5</Text>
-            </View>
-            <Text style={styles.ratingCount}>108 Pages</Text>
-            <Text style={styles.language}>Eng Language</Text>
-          </View>
-
-          <View style={styles.detailsContainer}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Product code</Text>
-              <Text style={styles.detailValue}>8945251471125</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Supplier name</Text>
-              <Text style={styles.detailValue}>Alpha Books</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Author</Text>
-              <Text style={styles.detailValue}>{book.author}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Genre</Text>
-              <Text style={styles.detailValue}>Self-help</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Year of publication</Text>
-              <Text style={styles.detailValue}>2023</Text>
+          <View style={styles.coverAndInfo}>
+            <BookCover
+              coverImage={book.cover_image || ''}
+              title={book.title || ''}
+              style={styles.bookImage}
+            />
+            <View style={styles.headerInfo}>
+              <Text style={styles.title}>{book.title || ''}</Text>
+              <Text style={styles.author}>{authorName || 'Unknown'}</Text>
+              <TouchableOpacity style={[styles.statusButton, book.status === 'active' ? styles.statusActive : styles.statusInactive]}>
+                <Text style={[styles.statusText, book.status === 'active' ? styles.statusActiveText : styles.statusInactiveText]}>{book.status === 'active' ? 'Available' : 'Unavailable'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => navigation.navigate('EditBook', { bookId: book.id })}
+              >
+                <Text style={styles.editButtonText}>Edit Information</Text>
+              </TouchableOpacity>
             </View>
           </View>
-
-          <View style={styles.descriptionContainer}>
-            <Text style={styles.descriptionTitle}>Product description</Text>
-            <Text style={styles.description}>
-              Have you ever sat down to work, and then, without realizing it,
-              you start checking social media? This book will help you stay
-              focused on the task at hand. Learning how to do deep work - the
-              ability to focus on a difficult task without distraction - is key
-              to producing better results in less time.
-            </Text>
-          </View>
         </View>
+
+        {/* Book Details Section */}
+        <View style={styles.infoSection}>
+          {book.isbn && (
+            <View style={styles.infoRow}><Text style={styles.infoLabel}>ISBN</Text><Text style={styles.infoValue}>{book.isbn}</Text></View>
+          )}
+          {book.published_date && (
+            <View style={styles.infoRow}><Text style={styles.infoLabel}>Published</Text><Text style={styles.infoValue}>{book.published_date}</Text></View>
+          )}
+          <View style={styles.infoRow}><Text style={styles.infoLabel}>Total copies</Text><Text style={styles.infoValue}>{book.total_copies ?? '-'}</Text></View>
+          <View style={styles.infoRow}><Text style={styles.infoLabel}>Available</Text><Text style={styles.infoValue}>{book.available_copies ?? '-'}</Text></View>
+          {categoryName ? (
+            <View style={styles.infoRow}><Text style={styles.infoLabel}>Category</Text><Text style={styles.infoValue}>{categoryName}</Text></View>
+          ) : null}
+        </View>
+
+        {/* Description Section */}
+        {book.description ? (
+          <View style={styles.descSection}>
+            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.description}>{book.description}</Text>
+          </View>
+        ) : null}
       </ScrollView>
-
-      <View style={styles.footer}>
-        <View style={styles.priceContainer}>
-          <Text style={styles.priceLabel}>Price</Text>
-          <Text style={styles.price}>${book.price.toFixed(2)}</Text>
-        </View>
-        <TouchableOpacity style={styles.addToCartButton}>
-          <Text style={styles.addToCartText}>Buy Now</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -103,123 +106,133 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
+  headerSection: {
+    padding: 20,
+    paddingBottom: 0,
   },
   backButton: {
+    position: 'absolute',
+    top: 8,
+    left: 0,
+    zIndex: 2,
     padding: 8,
   },
-  favoriteButton: {
-    padding: 8,
-  },
-  imageContainer: {
-    height: 300,
-    backgroundColor: COLORS.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  coverAndInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 24,
   },
   bookImage: {
-    width: '80%',
-    height: '80%',
+    width: 110,
+    height: 160,
+    borderRadius: 10,
+    marginRight: 18,
+    backgroundColor: COLORS.lightGray,
   },
-  infoContainer: {
-    padding: 24,
+  headerInfo: {
+    flex: 1,
+    justifyContent: 'flex-start',
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: COLORS.black,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   author: {
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.gray,
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  ratingContainer: {
+  statusButton: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    marginTop: 2,
+  },
+  statusActive: {
+    backgroundColor: '#E6F6EC',
+  },
+  statusInactive: {
+    backgroundColor: '#F6E6E6',
+  },
+  statusText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  statusActiveText: {
+    color: '#3CB371',
+  },
+  statusInactiveText: {
+    color: '#FF4B4B',
+  },
+  editButton: {
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  editButtonText: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  infoSection: {
+    marginTop: 28,
+    marginHorizontal: 20,
+    backgroundColor: '#F8F8FA',
+    borderRadius: 12,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 10,
   },
-  rating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
+  infoLabel: {
+    width: 120,
+    color: COLORS.gray,
+    fontWeight: '500',
+    fontSize: 15,
   },
-  ratingText: {
-    marginLeft: 4,
+  infoValue: {
+    flex: 1,
     color: COLORS.black,
-    fontWeight: '600',
-  },
-  ratingCount: {
-    color: COLORS.gray,
-    marginRight: 16,
-  },
-  language: {
-    color: COLORS.gray,
-  },
-  detailsContainer: {
-    marginBottom: 24,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  detailLabel: {
-    color: COLORS.gray,
-  },
-  detailValue: {
-    color: COLORS.black,
+    fontSize: 15,
     fontWeight: '500',
   },
-  descriptionContainer: {
-    marginBottom: 24,
+  descSection: {
+    marginTop: 28,
+    marginHorizontal: 20,
+    marginBottom: 32,
+    backgroundColor: '#F8F8FA',
+    borderRadius: 12,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  descriptionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
     color: COLORS.black,
     marginBottom: 8,
   },
   description: {
     color: COLORS.gray,
+    fontSize: 15,
     lineHeight: 20,
-  },
-  footer: {
-    flexDirection: 'row',
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
-  },
-  priceContainer: {
-    flex: 1,
-    marginRight: 16,
-  },
-  priceLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  price: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  addToCartButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingHorizontal: 32,
-    justifyContent: 'center',
-  },
-  addToCartText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 

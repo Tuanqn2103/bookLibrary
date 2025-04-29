@@ -3,24 +3,26 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Image,
   TextInput,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Dimensions,
+  ScrollView,
 } from 'react-native';
 import { bookService } from '../../services/book.service';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import { supabase } from '../../config/supabase';
 import BookCover from '../../components/BookCover';
+
+const { width } = Dimensions.get('window');
+const ITEM_WIDTH = (width - 48) / 3; // 16px padding * 2 + 8px giữa các item
 
 const AdminHomeScreen = ({ navigation }) => {
   const [books, setBooks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [totalBooks, setTotalBooks] = useState(0);
 
   useEffect(() => {
     loadBooks();
@@ -31,9 +33,11 @@ const AdminHomeScreen = ({ navigation }) => {
       setLoading(true);
       const data = await bookService.getAllBooks();
       setBooks(data || []);
+      setTotalBooks((data && data.length) || 0);
     } catch (error) {
       console.error('Error loading books:', error);
       Alert.alert('Error', 'Failed to load books. Please try again.');
+      setTotalBooks(0);
     } finally {
       setLoading(false);
     }
@@ -45,7 +49,6 @@ const AdminHomeScreen = ({ navigation }) => {
       loadBooks();
       return;
     }
-
     try {
       setLoading(true);
       const results = await bookService.searchBooks(query);
@@ -57,118 +60,93 @@ const AdminHomeScreen = ({ navigation }) => {
       setLoading(false);
     }
   };
-  
+
   const filteredBooks = books.filter(book =>
     book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     book.author.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const categories = [
-    { id: 1, name: 'Biography', icon: '👤' },
+    { id: 1, name: 'Biographies', icon: '👤' },
     { id: 2, name: 'Business', icon: '💼' },
     { id: 3, name: "Children's", icon: '🧸' },
     { id: 4, name: 'Novel', icon: '📚' },
-    { id: 5, name: 'Sports', icon: '⚽' },
+    { id: 5, name: 'Technical', icon: '💡' },
   ];
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [2, 3],
-        quality: 1,
-      });
-
-      if (!result.canceled) {
-        const selectedImage = result.assets[0];
-        const fileName = `book-cover-${Date.now()}.jpg`;
-        const destinationUri = FileSystem.documentDirectory + 'book-covers/' + fileName;
-        
-        await FileSystem.copyAsync({
-          from: selectedImage.uri,
-          to: destinationUri
-        });
-        
-        return fileName; // Trả về tên file để lưu vào database
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
-    }
-  };
-
   const handleBookPress = (book) => {
-    console.log('Navigating to book detail:', book);
-    navigation.navigate('BookDetail', { 
+    navigation.navigate('BookDetail', {
       bookId: book.id,
-      bookData: book // Truyền thêm dữ liệu sách để tránh phải load lại
+      bookData: book
     });
   };
 
+  const renderBookItem = ({ item }) => (
+    <TouchableOpacity style={styles.bookItem} onPress={() => handleBookPress(item)}>
+      <BookCover coverImage={item.cover_image} title={item.title} style={styles.bookCover} />
+      <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
+      <Text style={styles.bookAuthor} numberOfLines={1}>by {item.author}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.storeName}>BOOKSTORE</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search"
-          value={searchQuery}
-          onChangeText={handleSearch}
-        />
-      </View>
-
-      <Text style={styles.sectionTitle}>Category</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryContainer}>
-        {categories.map(category => (
-          <TouchableOpacity key={category.id} style={styles.categoryItem}>
-            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <Text style={styles.categoryName}>{category.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <View style={styles.totalBookContainer}>
-        <Text style={styles.totalBookText}>Total of book</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => navigation.navigate('AddBook')}
-        >
-          <Text style={styles.addButtonText}>Add new book</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6B4EFF" />
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.storeName}>BOOKSTORE</Text>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              value={searchQuery}
+              onChangeText={handleSearch}
+              placeholderTextColor="#888"
+            />
+          </View>
         </View>
-      ) : (
-        <ScrollView style={styles.bookList}>
-          {filteredBooks.map((book) => (
-            <TouchableOpacity
-              key={book.id}
-              style={styles.bookItem}
-              onPress={() => handleBookPress(book)}
-            >
-              <BookCover 
-                coverImage={book.cover_image} 
-                title={book.title} 
-              />
-              <View style={styles.bookInfo}>
-                <Text style={styles.bookTitle} numberOfLines={2}>
-                  {book.title}
-                </Text>
-                <Text style={styles.bookAuthor}>by {book.author}</Text>
-                <Text style={styles.bookCategory}>{book.category}</Text>
-                <Text style={styles.bookStatus}>Status: {book.status}</Text>
-                <Text style={styles.bookCopies}>
-                  Copies: {book.available_copies}/{book.total_copies}
-                </Text>
+        <Text style={styles.sectionTitle}>Category</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+          <View style={styles.categoryContainer}>
+            {categories.map(category => (
+              <View key={category.id} style={styles.categoryItem}>
+                <View style={styles.categoryCircle}>
+                  <Text style={styles.categoryIcon}>{category.icon}</Text>
+                </View>
+                <Text style={styles.categoryName}>{category.name}</Text>
               </View>
-            </TouchableOpacity>
-          ))}
+            ))}
+          </View>
         </ScrollView>
-      )}
+        <View style={styles.totalBookContainer}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+            <Text style={styles.totalBookText}>Total of book</Text>
+            <Text style={styles.totalBookCount}> ({totalBooks})</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddBook')}
+          >
+            <Text style={styles.addButtonText}>Add new book</Text>
+          </TouchableOpacity>
+        </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#6B4EFF" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredBooks}
+            renderItem={renderBookItem}
+            keyExtractor={item => item.id.toString()}
+            numColumns={3}
+            columnWrapperStyle={styles.bookRow}
+            contentContainerStyle={styles.bookList}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
+          />
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -177,63 +155,105 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+    paddingTop: 8,
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    marginBottom: 8,
   },
   storeName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#6B4EFF',
-    marginBottom: 16,
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    height: 40,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 8,
+    color: '#888',
   },
   searchInput: {
-    backgroundColor: '#F5F5F5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    flex: 1,
+    fontSize: 14,
+    color: '#222',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 16,
-    marginBottom: 12,
+    marginBottom: 8,
+    color: '#222',
+  },
+  categoryScroll: {
+    marginBottom: 8,
   },
   categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingLeft: 16,
-    marginBottom: 24,
   },
   categoryItem: {
     alignItems: 'center',
-    marginRight: 24,
+    marginRight: 20,
+  },
+  categoryCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   categoryIcon: {
     fontSize: 24,
-    marginBottom: 4,
   },
   categoryName: {
-    fontSize: 12,
+    fontSize: 10,
+    color: '#222',
   },
   totalBookContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   totalBookText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#222',
+  },
+  totalBookCount: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
   },
   addButton: {
     backgroundColor: '#6B4EFF',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    minWidth: 100,
+    alignItems: 'center',
   },
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 12,
   },
   loadingContainer: {
     flex: 1,
@@ -241,75 +261,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bookList: {
-    padding: 16,
+    paddingHorizontal: 8,
+    paddingBottom: 16,
+  },
+  bookRow: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   bookItem: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  bookCoverContainer: {
-    width: 100,
-    height: 150,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#F5F5F5',
-    position: 'relative',
+    width: ITEM_WIDTH,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   bookCover: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  bookInfo: {
-    flex: 1,
-    padding: 12,
-  },
-  bookTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  bookAuthor: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  bookCategory: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  bookStatus: {
-    fontSize: 12,
-    color: '#666',
-    textTransform: 'capitalize',
-    marginBottom: 4,
-  },
-  bookCopies: {
-    fontSize: 12,
-    color: '#666',
-  },
-  imageLoader: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-  },
-  errorContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 90,
+    height: 130,
+    borderRadius: 8,
+    marginBottom: 8,
     backgroundColor: '#F5F5F5',
   },
-  errorText: {
+  bookTitle: {
     fontSize: 12,
+    fontWeight: 'bold',
+    color: '#222',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  bookAuthor: {
+    fontSize: 10,
     color: '#666',
     textAlign: 'center',
   },
