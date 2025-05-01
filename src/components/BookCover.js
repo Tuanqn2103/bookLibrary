@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { supabaseUrl } from '../config/supabase';
 
-const BookCover = ({ coverImage, title }) => {
+const BookCover = ({ coverImage, title, style }) => {
   const [hasError, setHasError] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
 
@@ -39,8 +39,8 @@ const BookCover = ({ coverImage, title }) => {
   };
 
   return (
-    <View style={styles.bookCoverContainer}>
-      {imageUrl ? (
+    <View style={[styles.bookCoverContainer, style]}>
+      {imageUrl && !hasError ? (
         <Image
           source={{ 
             uri: imageUrl,
@@ -55,12 +55,7 @@ const BookCover = ({ coverImage, title }) => {
         />
       ) : (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No Image</Text>
-        </View>
-      )}
-      {hasError && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No Image</Text>
+          <Text style={styles.errorText} numberOfLines={2}>{title || 'No Image'}</Text>
         </View>
       )}
     </View>
@@ -69,8 +64,7 @@ const BookCover = ({ coverImage, title }) => {
 
 const styles = StyleSheet.create({
   bookCoverContainer: {
-    width: 100,
-    height: 150,
+    aspectRatio: 0.67,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
@@ -80,18 +74,15 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   errorContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    padding: 8,
   },
   errorText: {
-    color: '#666',
+    color: '#666666',
     fontSize: 12,
+    textAlign: 'center',
   },
 });
 

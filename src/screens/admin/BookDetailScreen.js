@@ -109,9 +109,35 @@ const BookDetailScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>{'<'} Back</Text>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>{'<'}</Text>
           </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.headerButton, styles.editButton]}
+              onPress={() => {
+                if (!book) {
+                  Alert.alert('Error', 'Book data is not available');
+                  return;
+                }
+                navigation.navigate('EditBook', { 
+                  bookId: book.id,
+                  bookData: book
+                });
+              }}
+            >
+              <Text style={styles.headerButtonText}>Edit Information</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.headerButton, styles.deleteButton]}
+              onPress={handleDelete}
+            >
+              <Text style={styles.headerButtonText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.header}>
           <BookCover 
@@ -127,29 +153,6 @@ const BookDetailScreen = ({ route, navigation }) => {
             <Text style={styles.bookCopies}>
               Copies: {book.available_copies || 0}/{book.total_copies || 0}
             </Text>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.editButton]}
-                onPress={() => {
-                  if (!book) {
-                    Alert.alert('Error', 'Book data is not available');
-                    return;
-                  }
-                  navigation.navigate('EditBook', { 
-                    bookId: book.id,
-                    bookData: book
-                  });
-                }}
-              >
-                <Text style={styles.buttonText}>Edit Information</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.deleteButton]}
-                onPress={handleDelete}
-              >
-                <Text style={styles.buttonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 
@@ -209,99 +212,37 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    marginBottom: 0,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+    backgroundColor: '#FFFFFF',
   },
   backButton: {
     padding: 8,
     borderRadius: 8,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: 24,
     color: '#6B4EFF',
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  header: {
-    padding: 16,
+  headerActions: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 8,
   },
-  bookCover: {
-    width: 120,
-    height: 180,
-    marginRight: 20,
-  },
-  bookInfo: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  bookTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  bookAuthor: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
-  },
-  bookCategory: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  bookStatus: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  bookCopies: {
-    fontSize: 14,
-    color: '#666',
-  },
-  detailsSection: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    width: 120,
-    color: '#666',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 16,
-    gap: 12,
-  },
-  button: {
+  headerButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    minWidth: 120,
-    alignItems: 'center',
+    marginLeft: 8,
+  },
+  headerButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 14,
   },
   editButton: {
     backgroundColor: '#6B4EFF',
@@ -309,9 +250,87 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#FF4B4B',
   },
-  buttonText: {
-    color: 'white',
+  header: {
+    padding: 20,
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  bookCover: {
+    width: '35%',
+    aspectRatio: 0.67,
+    borderRadius: 8,
+    marginRight: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  bookInfo: {
+    flex: 1,
+    paddingVertical: 4,
+  },
+  bookTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 12,
+  },
+  bookAuthor: {
+    fontSize: 16,
+    color: '#666666',
+    marginBottom: 8,
+  },
+  bookCategory: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  bookStatus: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
+  },
+  bookCopies: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 16,
+  },
+  detailsSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 15,
+    color: '#666666',
+    lineHeight: 24,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    width: '35%',
+    color: '#666666',
+  },
+  infoValue: {
+    fontSize: 15,
+    color: '#000000',
+    flex: 1,
   },
 });
 

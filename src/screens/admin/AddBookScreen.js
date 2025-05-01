@@ -169,6 +169,12 @@ const AddBookScreen = ({ navigation }) => {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+        <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>{'<'}</Text>
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Add book</Text>
         </View>
 
@@ -315,14 +321,16 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 44 : 0,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    borderBottomColor: '#F5F5F5',
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 16,
   },
   form: {
     padding: 16,
@@ -421,6 +429,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#6B4EFF',
+    fontWeight: 'bold',
   },
 });
 

@@ -2,315 +2,382 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  TextInput,
   Alert,
   ActivityIndicator,
+  Image,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { bookService } from '../../services/book.service';
+import { storageService } from '../../services/storage.service';
+import { authorService } from '../../services/author.service';
+import { categoryService } from '../../services/category.service';
+import { imageUploader } from '../../utils/ImageUploader';
+import CustomDropdown from '../../components/CustomDropdown';
 
 const EditBookScreen = ({ route, navigation }) => {
   const { bookId, bookData } = route.params;
+  const [title, setTitle] = useState('');
+  const [authorId, setAuthorId] = useState('');
+  const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [isbn, setIsbn] = useState('');
+  const [publishedDate, setPublishedDate] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [date, setDate] = useState(new Date());
+  const [coverImage, setCoverImage] = useState('');
+  const [totalCopies, setTotalCopies] = useState('1');
+  const [availableCopies, setAvailableCopies] = useState('1');
+  const [status, setStatus] = useState('active');
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    author: '',
-    description: '',
-    category: '',
-    isbn: '',
-    published_date: '',
-    total_copies: '',
-    available_copies: '',
-    status: '',
-    cover_image: ''
-  });
+  const [categories, setCategories] = useState([]);
+  const [authors, setAuthors] = useState([]);
+  const [imageUri, setImageUri] = useState(null);
+  const [selectedAuthorName, setSelectedAuthorName] = useState('');
+  const [selectedCategoryName, setSelectedCategoryName] = useState('');
 
   useEffect(() => {
-    const initializeForm = async () => {
-      try {
-        setLoading(true);
-        
-        // Nếu có bookData, sử dụng nó
-        if (bookData) {
-          setFormData({
-            title: bookData.title || '',
-            author: bookData.author || '',
-            description: bookData.description || '',
-            category: bookData.category || '',
-            isbn: bookData.isbn || '',
-            published_date: bookData.published_date || '',
-            total_copies: bookData.total_copies?.toString() || '0',
-            available_copies: bookData.available_copies?.toString() || '0',
-            status: bookData.status || 'available',
-            cover_image: bookData.cover_image || ''
-          });
-        } 
-        // Nếu không có bookData nhưng có bookId, fetch dữ liệu từ server
-        else if (bookId) {
-          const fetchedBook = await bookService.getBookById(bookId);
-          if (fetchedBook) {
-            setFormData({
-              title: fetchedBook.title || '',
-              author: fetchedBook.author || '',
-              description: fetchedBook.description || '',
-              category: fetchedBook.category || '',
-              isbn: fetchedBook.isbn || '',
-              published_date: fetchedBook.published_date || '',
-              total_copies: fetchedBook.total_copies?.toString() || '0',
-              available_copies: fetchedBook.available_copies?.toString() || '0',
-              status: fetchedBook.status || 'available',
-              cover_image: fetchedBook.cover_image || ''
-            });
-          } else {
-            Alert.alert('Error', 'Book not found');
-            navigation.goBack();
-          }
-        } else {
-          Alert.alert('Error', 'No book data or ID provided');
-          navigation.goBack();
-        }
-      } catch (error) {
-        Alert.alert('Error', `Failed to load book data: ${error.message}`);
-        navigation.goBack();
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    fetchCategoriesAndAuthors();
     initializeForm();
-  }, [bookId, bookData, navigation]);
+  }, []);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  useEffect(() => {
+    // Find and set author name when authorId or authors change
+    if (authorId && authors.length > 0) {
+      const author = authors.find(a => a.id.toString() === authorId.toString());
+      if (author) {
+        setSelectedAuthorName(author.authorname || author.name || 'Unknown Author');
+      }
+    }
 
-  const validateForm = () => {
-    if (!formData.title.trim()) {
-      Alert.alert('Error', 'Title is required');
-      return false;
+    // Find and set category name when categoryId or categories change
+    if (categoryId && categories.length > 0) {
+      const category = categories.find(c => c.id.toString() === categoryId.toString());
+      if (category) {
+        setSelectedCategoryName(category.categoryname || category.name || 'Unknown Category');
+      }
     }
-    if (!formData.author.trim()) {
-      Alert.alert('Error', 'Author is required');
-      return false;
-    }
-    if (isNaN(formData.total_copies) || parseInt(formData.total_copies) < 0) {
-      Alert.alert('Error', 'Total copies must be a positive number');
-      return false;
-    }
-    if (isNaN(formData.available_copies) || parseInt(formData.available_copies) < 0) {
-      Alert.alert('Error', 'Available copies must be a positive number');
-      return false;
-    }
-    if (parseInt(formData.available_copies) > parseInt(formData.total_copies)) {
-      Alert.alert('Error', 'Available copies cannot be greater than total copies');
-      return false;
-    }
-    return true;
-  };
+  }, [authorId, categoryId, authors, categories]);
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
+  const fetchCategoriesAndAuthors = async () => {
     try {
       setLoading(true);
+      const [categoriesData, authorsData] = await Promise.all([
+        categoryService.getAllCategories(),
+        authorService.getAllAuthors()
+      ]);
       
-      const updatedData = {
-        ...formData,
-        total_copies: parseInt(formData.total_copies),
-        available_copies: parseInt(formData.available_copies)
-      };
-
-      Alert.alert('Debug Info', `Updating book with data: ${JSON.stringify(updatedData, null, 2)}`);
-      await bookService.updateBook(bookId, updatedData);
+      if (categoriesData && categoriesData.length > 0) {
+        setCategories(categoriesData);
+      }
       
-      Alert.alert(
-        'Success',
-        'Book updated successfully',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack()
-          }
-        ]
-      );
+      if (authorsData && authorsData.length > 0) {
+        setAuthors(authorsData);
+      }
     } catch (error) {
-      Alert.alert('Error', `Failed to update book: ${error.message}`);
+      console.error('Error fetching data:', error);
+      Alert.alert('Error', 'Failed to load categories and authors');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6B4EFF" />
-        <Text style={styles.loadingText}>Updating book...</Text>
-      </View>
-    );
-  }
+  const initializeForm = async () => {
+    try {
+      setLoading(true);
+      
+      if (bookData) {
+        setTitle(bookData.title || '');
+        setAuthorId(bookData.author_id?.toString() || bookData.author?.id?.toString() || '');
+        setDescription(bookData.description || '');
+        setCategoryId(bookData.category_id?.toString() || bookData.category?.id?.toString() || '');
+        setIsbn(bookData.isbn || '');
+        setPublishedDate(bookData.published_date || '');
+        setTotalCopies(bookData.total_copies?.toString() || '1');
+        setAvailableCopies(bookData.available_copies?.toString() || '1');
+        setStatus(bookData.status || 'active');
+        setCoverImage(bookData.cover_image || '');
+        setImageUri(bookData.cover_image || null);
+        
+        if (bookData.published_date) {
+          setDate(new Date(bookData.published_date));
+        }
+      } else if (bookId) {
+        const fetchedBook = await bookService.getBookById(bookId);
+        if (fetchedBook) {
+          setTitle(fetchedBook.title || '');
+          setAuthorId(fetchedBook.author_id?.toString() || fetchedBook.author?.id?.toString() || '');
+          setDescription(fetchedBook.description || '');
+          setCategoryId(fetchedBook.category_id?.toString() || fetchedBook.category?.id?.toString() || '');
+          setIsbn(fetchedBook.isbn || '');
+          setPublishedDate(fetchedBook.published_date || '');
+          setTotalCopies(fetchedBook.total_copies?.toString() || '1');
+          setAvailableCopies(fetchedBook.available_copies?.toString() || '1');
+          setStatus(fetchedBook.status || 'active');
+          setCoverImage(fetchedBook.cover_image || '');
+          setImageUri(fetchedBook.cover_image || null);
+          
+          if (fetchedBook.published_date) {
+            setDate(new Date(fetchedBook.published_date));
+          }
+        } else {
+          Alert.alert('Error', 'Book not found');
+          navigation.goBack();
+        }
+      }
+
+      // Fetch categories and authors after setting the initial values
+      const [categoriesData, authorsData] = await Promise.all([
+        categoryService.getAllCategories(),
+        authorService.getAllAuthors()
+      ]);
+      
+      if (categoriesData && categoriesData.length > 0) {
+        setCategories(categoriesData);
+      }
+      
+      if (authorsData && authorsData.length > 0) {
+        setAuthors(authorsData);
+      }
+    } catch (error) {
+      Alert.alert('Error', `Failed to load book data: ${error.message}`);
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await imageUploader.pickImage();
+      if (result) {
+        setImageUri(result.uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setDate(selectedDate);
+      setPublishedDate(selectedDate.toISOString().split('T')[0]);
+    }
+  };
+
+  const handleUpdateBook = async () => {
+    if (!title || !authorId || !categoryId || !isbn) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (parseInt(availableCopies) > parseInt(totalCopies)) {
+      Alert.alert('Error', 'Available copies cannot be greater than total copies');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      let coverImageUrl = coverImage;
+      if (imageUri && imageUri !== coverImage) {
+        coverImageUrl = await storageService.uploadImage(imageUri, `book-covers/${Date.now()}.jpg`);
+      }
+
+      const bookData = {
+        title,
+        author_id: parseInt(authorId),
+        description,
+        category_id: parseInt(categoryId),
+        isbn,
+        published_date: publishedDate,
+        cover_image: coverImageUrl,
+        total_copies: parseInt(totalCopies),
+        available_copies: parseInt(availableCopies),
+        status
+      };
+
+      await bookService.updateBook(bookId, bookData);
+      Alert.alert('Success', 'Book updated successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (error) {
+      console.error('Error updating book:', error);
+      Alert.alert('Error', 'Failed to update book. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'lost', label: 'Lost' },
+    { value: 'damaged', label: 'Damaged' }
+  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton} 
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>{'<'} Back</Text>
+            <Text style={styles.backButtonText}>{'<'}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Book</Text>
+          <Text style={styles.headerTitle}>Edit book</Text>
         </View>
 
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Title *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.title}
-              onChangeText={(text) => handleInputChange('title', text)}
-              placeholder="Enter book title"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.sectionTitle}>Book information</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Author *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.author}
-              onChangeText={(text) => handleInputChange('author', text)}
-              placeholder="Enter author name"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Title *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Book name here"
+            value={title}
+            onChangeText={setTitle}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={formData.description}
-              onChangeText={(text) => handleInputChange('description', text)}
-              placeholder="Enter book description"
-              multiline
-              numberOfLines={4}
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Author *</Text>
+          <CustomDropdown
+            value={authorId}
+            options={authors.map(author => ({
+              label: author.authorname || author.name || 'Unknown Author',
+              value: author.id
+            }))}
+            onSelect={(value) => {
+              setAuthorId(value);
+              const selectedAuthor = authors.find(a => a.id.toString() === value.toString());
+              if (selectedAuthor) {
+                setSelectedAuthorName(selectedAuthor.authorname || selectedAuthor.name || 'Unknown Author');
+              }
+            }}
+            placeholder={selectedAuthorName || "Select from list"}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Category</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.category}
-              onChangeText={(text) => handleInputChange('category', text)}
-              placeholder="Enter book category"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Category *</Text>
+          <CustomDropdown
+            value={categoryId}
+            options={categories.map(category => ({
+              label: category.categoryname || category.name || 'Unknown Category',
+              value: category.id
+            }))}
+            onSelect={(value) => {
+              setCategoryId(value);
+              const selectedCategory = categories.find(c => c.id.toString() === value.toString());
+              if (selectedCategory) {
+                setSelectedCategoryName(selectedCategory.categoryname || selectedCategory.name || 'Unknown Category');
+              }
+            }}
+            placeholder={selectedCategoryName || "Choose a category"}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>ISBN</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.isbn}
-              onChangeText={(text) => handleInputChange('isbn', text)}
-              placeholder="Enter ISBN"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Enter a description"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Published Date</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.published_date}
-              onChangeText={(text) => handleInputChange('published_date', text)}
-              placeholder="Enter published date"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>ISBN *</Text>
+          <TextInput
+            style={styles.input}
+            value={isbn}
+            onChangeText={setIsbn}
+            placeholder="ISBN here"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Total Copies</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.total_copies}
-              onChangeText={(text) => handleInputChange('total_copies', text)}
-              placeholder="Enter total copies"
-              keyboardType="numeric"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Published Date</Text>
+          <TouchableOpacity 
+            style={styles.input} 
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.inputText}>
+              {publishedDate ? publishedDate : 'Select published date'}
+            </Text>
+          </TouchableOpacity>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Available Copies</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.available_copies}
-              onChangeText={(text) => handleInputChange('available_copies', text)}
-              placeholder="Enter available copies"
-              keyboardType="numeric"
-              editable={!loading}
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onDateChange}
+              maximumDate={new Date()}
             />
-          </View>
+          )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Status</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.status}
-              onChangeText={(text) => handleInputChange('status', text)}
-              placeholder="Enter book status"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Total Copies *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter total number of copies"
+            value={totalCopies}
+            onChangeText={setTotalCopies}
+            keyboardType="numeric"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Cover Image URL</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.cover_image}
-              onChangeText={(text) => handleInputChange('cover_image', text)}
-              placeholder="Enter cover image URL"
-              editable={!loading}
-            />
-          </View>
+          <Text style={styles.label}>Available Copies *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter available copies"
+            value={availableCopies}
+            onChangeText={setAvailableCopies}
+            keyboardType="numeric"
+          />
 
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
+          <Text style={styles.label}>Status</Text>
+          <CustomDropdown
+            value={status}
+            options={statusOptions}
+            onSelect={(value) => setStatus(value)}
+            placeholder="Select status"
+          />
+
+          <Text style={styles.label}>Cover Image</Text>
+          <TouchableOpacity style={styles.fileButton} onPress={pickImage}>
+            <Text style={styles.fileButtonText}>+ Choose a file</Text>
+          </TouchableOpacity>
+          {imageUri && (
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+          )}
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.addButton, loading && styles.addButtonDisabled]}
+            onPress={handleUpdateBook}
             disabled={loading}
           >
-            <Text style={styles.submitButtonText}>
-              {loading ? 'Updating...' : 'Update Book'}
-            </Text>
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.addButtonText}>Update book</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'ios' ? 44 : 0,
   },
   header: {
     flexDirection: 'row',
@@ -319,15 +386,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F5F5F5',
   },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#6B4EFF',
-    fontWeight: 'bold',
-  },
-  title: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 16,
@@ -335,40 +394,108 @@ const styles = StyleSheet.create({
   form: {
     padding: 16,
   },
-  inputGroup: {
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#000000',
     marginBottom: 8,
-    color: '#333',
   },
   input: {
+    height: 44,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E5E5E5',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#F9F9F9',
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    fontSize: 14,
+    color: '#000000',
+  },
+  inputText: {
+    fontSize: 14,
+    color: '#000000',
+    paddingVertical: 10,
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+    paddingTop: 12,
   },
-  submitButton: {
-    backgroundColor: '#6B4EFF',
+  disabledInput: {
+    backgroundColor: '#F5F5F5',
+  },
+  fileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#F8F8F8',
+  },
+  fileButtonText: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 16,
+    backgroundColor: '#F5F5F5',
+  },
+  footer: {
+    flexDirection: 'row',
     padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
+  cancelButton: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#4A3780',
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 24,
+    justifyContent: 'center',
+    marginRight: 8,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#CCCCCC',
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A3780',
   },
-  submitButtonText: {
-    color: 'white',
+  addButton: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#4A3780',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  addButtonDisabled: {
+    opacity: 0.5,
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  backButtonText: {
     fontSize: 16,
+    color: '#6B4EFF',
     fontWeight: 'bold',
   },
 });
