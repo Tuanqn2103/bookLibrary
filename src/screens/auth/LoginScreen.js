@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!username || !password) {
       Alert.alert('Error', 'Please enter both username and password');
       return;
@@ -33,12 +33,14 @@ const LoginScreen = ({ navigation }) => {
       
       const user = await authService.login(username, password);
       
-      // Điều hướng dựa vào role
-      if (user.role === 'admin') {
-        navigation.replace('AdminHome');
-      } else {
-        navigation.replace('Home');
-      }
+      // Sử dụng setTimeout để tránh race condition với navigation
+      setTimeout(() => {
+        if (user.role === 'admin') {
+          navigation.replace('AdminHome');
+        } else {
+          navigation.replace('Home');
+        }
+      }, 0);
     } catch (error) {
       Alert.alert(
         'Login Failed',
@@ -47,7 +49,11 @@ const LoginScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [username, password, navigation]);
+
+  const handleRegister = useCallback(() => {
+    navigation.navigate('Register');
+  }, [navigation]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -112,7 +118,7 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.signupContainer}>
           <Text style={styles.signupText}>Don't have a Bookstore account? </Text>
           <TouchableOpacity 
-            onPress={() => navigation.navigate('Register')}
+            onPress={handleRegister}
             disabled={loading}
           >
             <Text style={styles.signupLink}>Sign Up</Text>
